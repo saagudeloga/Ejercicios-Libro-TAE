@@ -1,0 +1,1921 @@
+---
+title: "Trabajo II"
+date: <img src="Escudo_color.png" alt="drawing" width="200"/>
+output:
+  rmdformats::material:
+    highlight: kate
+    code_folding: hide
+---
+
+<font color ="white"><center>*Marlon Gaviria | Samuel Agudelo | Federico Milotta*</center></font>
+
+<font color ="white"><center>*Nicolas Sarmiento | Carolina Vergara*</center></font>
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+library(tidyverse)
+library(kableExtra)
+```
+
+# <font color ="darkcyan">*Sesion 4.7.2*</font>{.tabset}
+
+## <font color ="white">*Punto 10*</font>{.tabset}
+
+This question should be answered using the Weekly data set, which
+is part of the ISLR package. This data is similar in nature to the
+Smarket data from this chapter’s lab, except that it contains 1, 089
+weekly returns for 21 years, from the beginning of 1990 to the end of
+2010.
+
+```{r, include=FALSE}
+library(ISLR)
+Weekly
+```
+
+### A
+
+Produce some numerical and graphical summaries of the Weekly
+data. Do there appear to be any patterns?
+
+```{r cars}
+dim(Weekly) # 9 variables con 1089 observaciones
+summary(Weekly)
+cor(Weekly[, -9]) # Existe alta correlacion entre el año y el volumen
+
+```
+Tenemos una base de datos que contiene 9 variables con 1089 observaciones.
+Al observar la matriz de correlacion notamos una alta dependencia positiva entre el año y el voumen, entre el resto de las variables no hay correlaciones significativas.
+```{r}
+plot(Volume ~ Year, data = Weekly)
+set.seed(2020)
+plot(Volume ~ jitter(Year, factor = 2.5), data = Weekly, 
+     xlab = "Year", ylab = "Volume (billions)")
+
+```
+
+Es evidente la dependencia lineal positiva entre la variable volumen y la variable año, sin embargo a partir del añ0 2005 esta dependencia no es tan notoria ya que vemos una mayor dispersion de los datos.
+
+### B
+
+Use the full data set to perform a logistic regression with
+Direction as the response and the ﬁve lag variables plus Volume
+as predictors. Use the summary function to print the results. Do
+any of the predictors appear to be statistically signiﬁcant? If so,
+which ones?
+```{r}
+
+logit_mod1 <- glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume,
+                 data = Weekly, family = binomial(link = "logit"))
+
+summary(logit_mod1) 
+
+
+```
+
+Con un nivel de significancia del 0.05 el unico predictor estadisticamente significativo es Lag2.
+
+### C
+
+Compute the confusion matrix and overall fraction of correct
+predictions. Explain what the confusion matrix is telling you
+about the types of mistakes made by logistic regression.
+```{r}
+
+# Resultados en probabilidades
+predlogit_mod1 <- predict(logit_mod1, type = "response")
+
+contrasts(Weekly$Direction)
+
+predlogit_mod1 <- ifelse(predlogit_mod1 > 0.5, yes = "Up", no = "Down")
+
+# Calculo de la matrix de confusion y porcentaje de predicciones correctas
+confusion <- function(prediction, data, cutoff=0.5){
+  real <- as.character(data$Direction)
+  a <- sum(real=="Down" & prediction=="Down") # correct positive prediction
+  b <- sum(real=="Up" & prediction=="Down") # incorrect positive prediction
+  c <- sum(real=="Down" & prediction=="Up") # correct negative prediction
+  d <- sum(real=="Up" & prediction=="Up") # incorrect negative prediction
+  CM <- data.frame("1" = c("Prediction","Down","Up"), 
+                   "2" = c("Down", a, c),
+                   "3" = c("Up", b, d))
+  names(CM) <- c("", "Real", "")
+  ACC <- (a + d) / (a + b + c + d) # = 1 - err
+  ERR <- (b + c) / (a + b + c + d) # = 1 - acc
+  
+return(list(confusion_matrix = CM, 
+            accuracy = ACC,
+            error = ERR))
+}
+
+confusion(predlogit_mod1, Weekly)
+
+```
+-la cantidad de positivos que fueron clasificados correctamente como positivos por el modelo son 54
+
+-la cantidad de negativos que fueron clasificados correctamente como negativos por el modelo son 48.
+
+-la cantidad de positivos que fueron clasificados incorrectamente como negativos son 430.
+
+-la cantidad de negativos que fueron clasificados incorrectamente como positivos son 557.
+
+Tenemos una exactitud equivalente a 0.56, dicha exactitud se refiere a la dispersion del conjunto de valores obtenidos a partir de mediciones repetidas. 
+Es asi como el el modelo  predijo correctamente en un 56%.
+El porcentaje de la base de datos clasifica incorrectamente equivale a 0.44.
+
+### D
+
+Now ﬁt the logistic regression model using a training data period
+from 1990 to 2008, with Lag2 as the only predictor. Compute the
+confusion matrix and the overall fraction of correct predictions
+for the held out data (that is, the data from 2009 and 2010).
+
+```{r}
+test <- c(which(Weekly$Year == 2009), which(Weekly$Year == 2010))
+train <- Weekly[-test, ]
+test <- Weekly[test, ]
+
+# Solo Lag2 con funcion de activacion: logistica
+logit_mod <- glm(Direction ~ Lag2,
+                 data = train, family = binomial(link = "logit"))
+# Resumen del modelo
+summary(logit_mod)
+
+# Resultados en probabilidades
+predlogit_mod <- predict(logit_mod, newdata = test, type = "response")
+
+predlogit_mod <- ifelse(predlogit_mod > 0.5, yes = "Up", no = "Down")
+
+confusion(predlogit_mod, test) # En el 62.5% de los casos la regresion predijo bien
+
+
+```
+
+-la cantidad de positivos que fueron clasificados correctamente como positivos por el modelo son 9
+
+-la cantidad de negativos que fueron clasificados correctamente como negativos por el modelo son 5.
+
+-la cantidad de positivos que fueron clasificados incorrectamente como negativos son 34.
+
+-la cantidad de negativos que fueron clasificados incorrectamente como positivos son 56.
+
+La regresion entrega muchos falsos negativos, es decir, en muchas ocasiones clasifica como Up a una observacion que debe ser Down
+
+Tenemos una exactitud equivalente a 0.625, dicha exactitud se refiere a la dispersion del conjunto de valores obtenidos a partir de mediciones repetidas. 
+Es asi como el el modelo  predijo correctamente en un 62.5%.
+El porcentaje de la base de datos clasifica incorrectamente equivale a 0.375.
+
+### E
+
+Repeat (d) using LDA
+```{r}
+library (MASS)
+lda_mod <- lda(Direction ~ Lag2,
+               data = train)
+
+predlda_mod <- as.character(predict(lda_mod, test)$class)
+
+confusion(predlda_mod, test) # En el 62.5% de los casos la regresiÃ³n predijo bien
+
+```
+Se obtienen los mismos resultados que en el item anterior.
+
+### F 
+
+Repeat (d) using QDA.
+```{r}
+qda_mod <- qda(Direction ~ Lag2, 
+               data = train)
+
+predqda_mod <- as.character(predict(qda_mod, test)$class)
+
+confusion(predqda_mod, test) # En el 58.7% de los casos la regresion predijo bien
+```
+-la cantidad de positivos que fueron clasificados correctamente como positivos por el modelo son 0
+
+-la cantidad de negativos que fueron clasificados correctamente como negativos por el modelo son 0
+
+-la cantidad de positivos que fueron clasificados incorrectamente como negativos son 43.
+
+-la cantidad de negativos que fueron clasificados incorrectamente como positivos son 61.
+
+
+Tenemos una exactitud equivalente a 0.5865 y eñ porcentaje de la base de datos clasifica incorrectamente equivale a 0.413.
+
+
+### G
+
+Repeat (d) using KNN with K =1.
+```{r }
+library(class)
+predknn_mod <- as.character(knn(train[, 3, drop = FALSE], test[, 3, drop = FALSE], cl = train$Direction, k = 1))
+
+confusion(predknn_mod, test) # En el 50.0% de los casos la regresion predijo bien
+```
+-la cantidad de positivos que fueron clasificados correctamente como positivos por el modelo son 21-
+
+-la cantidad de negativos que fueron clasificados correctamente como negativos por el modelo son 29.
+
+-la cantidad de positivos que fueron clasificados incorrectamente como negativos son 22.
+
+-la cantidad de negativos que fueron clasificados incorrectamente como positivos son 32.
+
+
+Tenemos una exactitud equivalente a 0.5096 y eñ porcentaje de la base de datos clasifica incorrectamente equivale a 0.4904.
+
+### H
+
+Which of these methods appears to provide the best results on
+this data?
+
+Los metodos que parecen proporcionar mejores resultados son Logit y LDA.
+
+### I
+
+Experiment with diﬀerent combinations of predictors, includ-
+ing possible transformations and interactions, for each of the
+methods. Report the variables, method, and associated confusion
+matrix that appears to provide the best results on the held
+out data. Note that you should also experiment with values for
+K in the KNN classiﬁer.
+```{r }
+# Probando Logit
+logit_mod2 <- glm(Direction ~ 1,
+                 data = train, family = binomial(link = "logit"))
+# Resumen del modelo
+summary(logit_mod2)
+
+# Resultados en probabilidades
+predlogit_mod2 <- predict(logit_mod2, newdata = test, type = "response")
+
+predlogit_mod2 <- ifelse(predlogit_mod2 > 0.5, yes = "Up", no = "Down")
+
+confusion(predlogit_mod2, test) # En el 58.7% de los casos la regresiÃ³n predijo bien
+```
+Realizar un modelo Logit con solo el intercepto produce los mismo resultados que un QDA con Lag2 como unico regresor.
+
+Probando LDA y QDA
+Al añadir mas variables en LDA y QDA se consigue sobreajustar el modelo y por lo mismo se disminuye la precision de las estimaciones.
+
+```{r }
+# Probando KNN
+predknn_mod <- as.character(knn(train[, 3, drop = FALSE], test[, 3, drop = FALSE], cl = train$Direction, k = 3))
+
+confusion(predknn_mod, test) # En el 54.8% de los casos la regresion predijo bien
+```
+Con tres grupos (k=3) se deja de aumentar la precision de las predicciones, entonces dicho k es el mas adecuado para obtener predicciones mas correctas.
+
+## <font color ="white">*Punto 11*</font>{.tabset}
+
+In this problem, you will develop a model to predict whether a given
+car gets high or low gas mileage based on the Auto data set.
+
+### A
+
+Create a binary variable, mpg01, that contains a 1 if mpg contains
+a value above its median, and a 0 if mpg contains a value below
+its median. You can compute the median using the median()
+function. Note you may ﬁnd it helpful to use the data.frame()
+function to create a single data set containing both mpg01 and
+the other Auto variables.
+```{r }
+library(ISLR)
+str(Auto)
+```
+poseemos una base de datos de 9 variables y 392 observaciones, sus variables son numericas a excepcion de la variable 'name'
+```{r }
+mediana <- median(Auto$mpg)
+mpg01 <- ifelse(Auto$mpg > mediana, yes = 1, no = 0)
+
+newAuto <- cbind(mpg01, Auto[, -1])
+
+summary(newAuto)
+
+```
+En el resumen anterior logramos visualizar los valores minimos y maximos de cada una de las variables, ademas tambien podemos visualizar su media y mediana.
+```{r }
+library(PerformanceAnalytics) 
+chart.Correlation(newAuto[, -c(9)], histogram = TRUE, method = "pearson")
+```
+
+
+
+### B
+
+Explore the data graphically in order to investigate the association
+between mpg01 and the other features. Which of the other
+features seem most likely to be useful in predicting mpg01?Scatterplots
+and boxplots may be useful tools to answer this question.
+Describe your ﬁndings.
+```{r }
+# Para no violar la normalidad se usan las covariables sin transformar a categoricas
+newAuto$mpg01 <- as.factor(as.character(newAuto$mpg01))
+
+plot(cylinders ~ mpg01, data = newAuto)
+plot(year ~ mpg01, data = newAuto)
+```
+
+
+Los boxplot los usamos para ver le comporatemiento de la variable respuesta, mirando el diagrama de cajas se puede observar que las medias parecen ser significativamente diferentes, es así que sería interesante incluir estas medidas.
+
+### C
+
+Split the data into a training set and a test set.
+
+conjunto de entrenamiento y de verificacion 
+```{r }
+set.seed(2020)
+test <- sample(1:nrow(newAuto), size = nrow(newAuto)*0.7, replace = FALSE)
+# Conjunto de entrenamiento
+train <- newAuto[test, ]
+# Conjunto de verificacion
+test <- newAuto[-test, ]
+```
+Cirlculo de la matriz de confusion y porcentaje de predicciones correctas
+```{r }
+confusion <- function(prediction, data){
+  real <- data$mpg01
+  a <- sum(real=="0" & prediction=="0") # correct positive prediction
+  b <- sum(real=="1" & prediction=="0") # incorrect positive prediction
+  c <- sum(real=="0" & prediction=="1") # correct negative prediction
+  d <- sum(real=="1" & prediction=="1") # incorrect negative prediction
+  CM <- data.frame("1" = c("Prediction","0","1"), 
+                   "2" = c("0", a, c),
+                   "3" = c("1", b, d))
+  names(CM) <- c("", "Real", "")
+  ACC <- (a + d) / (a + b + c + d) # = 1 - err
+  ERR <- (b + c) / (a + b + c + d) # = 1 - acc
+  
+  return(list(confusion_matrix = CM, 
+              accuracy = ACC,
+              error = ERR))
+}
+```
+
+### D 
+
+Perform LDA on the training data in order to predict mpg01
+using the variables that seemed most associated with mpg01 in
+(b). What is the test error of the model obtained?
+```{r }
+library (MASS)
+lda_mod <- lda(mpg01 ~ cylinders + displacement + horsepower + weight + year,
+               data = train)
+
+predlda_mod <- as.character(predict(lda_mod, test)$class)
+
+confusion(predlda_mod, test) 
+```
+El error de prueba es del 9.3%
+
+### E
+
+Perform QDA on the training data in order to predict mpg01
+using the variables that seemed most associated with mpg01 in
+(b). What is the test error of the model obtained?
+```{r }
+qda_mod <- qda(mpg01 ~ cylinders + displacement + horsepower + weight + year,
+               data = train)
+
+predqda_mod <- as.character(predict(qda_mod, test)$class)
+
+confusion(predqda_mod, test) 
+```
+El error de prueba es del 16.1%
+
+### F 
+
+Perform logistic regression on the training data in order to predict
+mpg01 using the variables that seemed most associated with
+mpg01 in (b). What is the test error of the model obtained?
+
+```{r }
+logit_mod <- glm(mpg01 ~ cylinders + displacement + horsepower + weight + year,
+                 data = train, family = binomial(link = "logit"))
+# Resumen del modelo
+summary(logit_mod)
+
+# Resultados en probabilidades
+predlogit_mod <- predict(logit_mod, newdata = test, type = "response")
+
+predlogit_mod <- ifelse(predlogit_mod > 0.5, yes = "1", no = "0")
+
+confusion(predlogit_mod, test) 
+
+```
+El error de prueba es del 12.7%
+
+### G
+
+Perform KNN on the training data, with several values of K ,in
+order to predict mpg01. Use only the variables that seemed most
+associated with mpg01 in (b). What test errors do you obtain?
+Which value of K seems to perform the best on this data set?
+```{r }
+library(class)
+predknn_mod <- as.character(knn(train[, -c(1, 6, 8, 9), drop = FALSE], test[, -c(1, 6, 8, 9), drop = FALSE], cl = train$mpg01, k = 3))
+
+confusion(predknn_mod, test) 
+```
+El error es del 18.6% ,con K=3
+
+## <font color ="white">*Punto 12*</font>{.tabset}
+
+This problem involves writing functions
+
+### A
+
+Write a function, Power(), that prints out the result of raising 2
+to the 3rd power. In other words, your function should compute
+2^3 and print out the results.
+Hint: Recal l that x^a raises x to the power a.Usetheprint()
+function to output the result.
+
+```{r }
+Power <- function(x) print(2^3)
+Power()
+```
+
+
+### B
+
+Create a new function, Power2(), that allows you to pass any
+two numbers, x and a, and prints out the value of x^a.Youcan
+do this by beginning your function with the line
+ Power2=function (x,a){
+You should be able to call your function by entering, for instance,
+ Power2(3,8)
+on the command line. This should output the value of 3^8,namely,
+6, 561.
+
+```{r }
+Power2 <- function(x, a) print(x^a)
+Power2(3, 8)
+```
+
+### C
+
+Using the Power2() function that you just wrote, compute 10^3,8^1, and 131^3
+
+```{r }
+Power2(10, 3)
+Power2(8, 17)
+Power2(131, 3)
+
+```
+
+### D
+
+Now create a new function, Power3(), that actually returns the
+result x^a as an R object, rather than simply printing it to the
+screen. That is, if you store the value x^a in an object called
+result within your function, then you can simply return() this
+result, using the following line:
+return()
+return(result)
+The line above should be the last line in your function, before
+the } symbol.
+```{r }
+Power3 <- function(x, a) return(x^a)
+```
+
+### E
+
+Now using the Power3() function, create a plot of f (x)=x^2.
+The x-axis should display a range of integers from 1 to 10, and
+the y-axis should display x^2.
+Label the axes appropriately, and
+use an appropriate title for the ﬁgure. Consider displaying either
+the x-axis, the y-axis, or both on the log-scale. You can do this
+by using log=‘‘x’’, log=‘‘y’’,orlog=‘‘xy’’ as arguments to
+the plot() function.
+
+```{r }
+x <- 1:10
+y <- Power3(x, 2)
+plot(x, y, pch = 19, las = 1, xaxt = "n", 
+     main = bquote(f(x) == x^2 ~ with ~ 1 <= ~ x <= 10))
+axis(1, at = 1:10, labels = 1:10)
+
+```
+
+### F
+
+Create a function, PlotPower(), that allows you to create a plot
+of x against x^a for a ﬁxed a and for a range of values of x.For
+instance, if you call
+ PlotPower (1:10,3)
+then a plot should be created with an x-axis taking on values
+1, 2,...,10, and a y-axis taking on values 1^3,2^3,...,10^3
+
+```{r }
+PlotPower <- function(x, a){
+  y <- x^a
+  plot(x, y, pch = 19, las = 1, xaxt = "n", yaxt = "n", 
+       main = bquote(f(x) == x^ ~ .(a) ~ with ~ .(x[1]) <= ~ x <= .(x[length(x)])))
+  axis(1, at = x, labels = x)
+  axis(2, at = x^a, labels = x^a, las = 1)
+}
+
+PlotPower(1:10, 3)
+
+
+```
+
+
+# <font color ="darkcyan">*Sesion 8.4*</font>{.tabset}
+
+## <font color ="white">Punto 7</font> {.tabset}
+
+In the lab, we applied random forests to the Boston data using mtry=6
+and using ntree=25 and ntree=500. Create a plot displaying the test error resulting from random forests on this data set for a more comprehensive range of values for mtry and ntree. You can model your plot after Figure 8.10. Describe the results obtained.
+
+```{r, warning=FALSE, message=FALSE, results='hide'}
+library(randomForest)
+library(MASS)
+library(tidyverse)
+library(ggplot2)
+```
+
+```{r}
+Boston
+set.seed(1)
+train = sample(1:nrow(Boston), nrow(Boston)/2)
+boston.test=Boston[-train ,"medv"]
+mtry_ <-  6:15
+ntree_ <- c(25, 50, 100, 150, 500)
+vect_error <- vector()
+vect_cate <- vector()
+k = 1
+for (i in mtry_){
+  for (j in ntree_){
+    rf.boston =randomForest(medv∼.,data=Boston ,subset =train , 
+                            mtry=i, importance =TRUE, ntree = j)
+    yhat.rf = predict(rf.boston , newdata=Boston[-train,])
+    vect_error[k] = mean((yhat.rf -boston.test)^2)
+    vect_cate[k] = str_c(i, j, sep='-')
+    k = k + 1
+    }
+    
+}
+```
+
+```{r}
+grup = c(rep('g1', 5), rep('g2', 5), rep('g3', 5), rep('g4', 5), rep('g5', 5), rep('g6', 5), 
+         rep('g7', 5), rep('g8', 5), rep('g9', 5), rep('g10', 5)) 
+df_error = data.frame(vect_cate, vect_error, rep(1:5, 10), grup)
+names(df_error) = c('tree_mtry', 'y', 'eje_x', 'grup')
+ggplot(df_error, aes(x = eje_x, y=y, group=grup, colour=grup)) +
+  geom_line()  + 
+  geom_point( size=2, shape=21, fill="white") + 
+  theme_minimal()
+```
+
+## <font color ="white">Punto 8</font> {.tabset}
+
+### A 
+
+Split the data set into a training set and a test set
+```{r}
+library(ISLR)
+library(caret)
+set.seed(123)
+train <- createDataPartition(y = Carseats$Sales, p = 0.8, list=FALSE, times = 1)
+dt_train <- Carseats[train, ]
+df_test <- Carseats[-train, ]
+```
+
+
+### B
+
+Fit a regression tree to the training set. Plot the tree, and interpret
+the results. What test MSE do you obtain?
+```{r}
+library(MASS)
+library(tree)
+tree.sales <- tree(Sales∼.,dt_train)
+summary(tree.sales)
+plot(tree.sales)
+text(tree.sales ,pretty =0, cex=0.6)
+```
+### C 
+
+Use cross-validation in order to determine the optimal level of
+tree complexity. Does pruning the tree improve the test MSE?
+
+```{r}
+cv.sales <- cv.tree(tree.sales)
+plot(cv.sales$size ,cv.sales$dev ,type='b')
+```
+### D
+
+Use the bagging approach in order to analyze this data. What test MSE do you obtain? Use the importance() function to determine which variables are most important.
+
+```{r}
+set.seed (1)
+bag.sales =randomForest(Sales∼.,data=dt_train, mtry=13, importance =TRUE)
+bag.sales
+
+
+yhat.bag = predict(bag.sales, newdata=df_test[,-1])
+
+cat('MSE TEST \n')
+sum((yhat.bag-df_test['Sales'])^2)/length(yhat.bag)
+
+importance(bag.sales)
+```
+
+
+###E
+
+Use random forests to analyze this data. What test MSE do you obtain? Use the importance() function to determine which variables aremost important. Describe the effect of m, the number of variables considered at each split, on the error rate obtained.
+
+```{r}
+rf.sale =randomForest(Sales∼.,data=dt_train, mtry=6, importance =TRUE)
+yhat.rf = predict (rf.sale ,newdata=df_test[,-1])
+
+cat('MSE TEST \n')
+sum((yhat.rf-df_test['Sales'])^2)/length(yhat.rf)
+
+
+importance(rf.sale)
+```
+## <font color ="white">Punto 9 </font>{.tabset}
+
+This problem involves the OJ data set which is part of the ISLR package.
+
+### A
+
+Create a training set containing a random sample of 800 observations, and a test set containing the remaining
+observations.
+
+```{r}
+library(ISLR)
+set.seed(1236)
+ind_train <- sample(1:1070, 800)
+train_OJ <- OJ[ind_train,]
+test_OJ <- OJ[-ind_train,]
+
+```
+
+
+### B
+
+Fit a tree to the training data, with Purchase as the response and the other variables as predictors. Use the summary() function to produce summary statistics about the tree, and describe the results obtained. What is the training error rate? How many terminal nodes does the tree have?
+
+```{r}
+
+tree.purch <- tree(Purchase∼.,train_OJ)
+summary(tree.purch)
+
+```
+
+### C 
+
+Type in the name of the tree object in order to get a detailed text output. Pick one of the terminal nodes, and interpret the information displayed.
+
+```{r}
+
+tree.purch
+
+```
+```{r}
+plot(tree.purch)
+text(tree.purch ,pretty =0, cex=0.6)
+```
+La primera selección se hace con la varible LoyalCH la cual representa la fidelización de marca del cliente como esta variable tiene valores entre 0,1 dependiendo del valor que tome se hace una clasificación a más MM y CH.
+
+### E
+
+Predict the response on the test data, and produce a confusion matrix comparing the test labels to the predicted test labels. What is the test error rate?
+
+```{r}
+tree.pred=predict(tree.purch, test_OJ[, -1], type="class")
+table(tree.pred ,test_OJ[, 1])
+cat("Tasa clasificación correct: \n")
+(154+65)/(154+65+18+33)
+```
+
+### F
+
+Apply the cv.tree() function to the training set in order to determine the optimal tree size.
+
+```{r}
+cv.purch <- cv.tree(tree.purch, FUN=prune.misclass)
+names(cv.purch)
+cv.purch
+```
+
+### G
+
+Produce a plot with tree size on the x-axis and cross-validated classification error rate on the y-axis.
+```{r}
+plot(cv.purch$size, cv.purch$dev ,type="b")
+plot(cv.purch$k, cv.purch$dev ,type="b")
+```
+
+### H
+
+Which tree size corresponds to the lowest cross-validated classification
+error rate?
+
+El tamaño del arbol que da una mejor tasa de clasificación en con seis nodos.
+
+
+### I
+
+Produce a pruned tree corresponding to the optimal tree size obtained using cross-validation. If cross-validation does not lead to selection of a pruned tree, then create a pruned tree with five terminal nodes.
+
+```{r}
+prune.purch = prune.misclass(tree.purch, best = 6)
+plot(prune.purch )
+text(prune.purch ,pretty =0)
+```
+
+
+### J
+
+Compare the training error rates between the pruned and unpruned
+trees. Which is higher?
+```{r}
+tree.pred=predict(prune.purch, test_OJ[, -1], type="class")
+table(tree.pred ,test_OJ[, 1])
+cat("Tasa clasificación correct: \n")
+(154+65)/(154+65+18+33)
+```
+La tasa de clasificación no vario ya que con seis nodos se llega al maxima tasa de calsificación por tanto no hay diferencia entre utilizar nueve o seis nodos.
+
+## <font color ="white">Punto 10</font>{.tabset}
+
+We now use boosting to predict Salary in the Hitters data set.
+
+### A
+
+Remove the observations for whom the salary information is  unknown, and then log-transform the salaries.
+
+```{r}
+Carseats <- Carseats[Carseats$Sales>0, ]
+Carseats['log_sales'] <- log(Carseats$Sales)
+```
+### B
+
+Create a training set consisting of the first 200 observations, and a test set consisting of the remaining observations.
+
+```{r}
+train <- Carseats[1:200,-1 ]
+test <- Carseats[201:length(Carseats), -1]
+
+```
+
+### C
+
+Perform boosting on the training set with 1,000 trees for a range of values of the shrinkage parameter λ. Produce a plot with different shrinkage values on the x-axis and the corresponding training set MSE on the y-axis.
+
+```{r}
+library (gbm)
+lmda <- c(0.1, 0.2, 0.3, 0.4, 0.5)
+vect_error <- vector()
+k <- 1
+for (i in lmda) {
+  boost.sale =gbm(log_sales∼.,train, distribution="gaussian",
+                    n.trees =1000 , interaction.depth =4, shrinkage = i , verbose =F)
+  vect_error[k] <- sum(boost.sale$train.error)/length(train)
+  k = k + 1
+  
+}
+
+plot(lmda, vect_error, type="b")
+
+```
+
+
+### D
+
+Produce a plot with different shrinkage values on the x-axis and the corresponding test set MSE on the y-axis.
+
+
+```{r}
+lmda <- c(0.1, 0.2, 0.3, 0.4, 0.5)
+vect_error <- vector()
+k <- 1
+for (i in lmda) {
+  boost.sales =gbm(log_sales∼.,train, distribution="gaussian",
+                    n.trees =1000 , interaction.depth =4, shrinkage = i , verbose =F)
+  yhat.boost=predict (boost.sales ,newdata = test[, -length(test)], n.trees =1000)
+  
+  vect_error[k] <- sum((yhat.boost-test[, length(test)])^2)/length(test)
+  k = k + 1
+  
+}
+
+plot(lmda, vect_error, type="b")
+
+```
+
+### E
+
+Which variables appear to be the most important predictors in
+the boosted model?
+
+```{r}
+boost.sales =gbm(log_sales∼.,train, distribution="gaussian",
+                 n.trees =1000 , interaction.depth =4, shrinkage = 0.2 , verbose =F)
+summary(boost.sales)
+```
+
+### F
+
+Now apply bagging to the training set. What is the test set MSE
+for this approach?
+
+```{r}
+bag.sales <- randomForest(log_sales∼.,data=train, mtry=13, importance =TRUE)
+bag.sales
+```
+## <font color ="white">Punto 11</font>{.tabset}
+
+This question uses the Caravan data set.
+
+### A
+
+Create a training set consisting of the first 1,000 observations, and a test set consisting of the remaining
+observations.
+
+```{r}
+df_caravan <- Caravan
+df_caravan['Purchase'] <- ifelse(df_caravan['Purchase']=='Yes', 1, 0)
+#df_caravan <- df_caravan[, -c(50, 71)]
+cr_train <- df_caravan[1:2000, ]
+cr_test <- df_caravan[2001:5822, ]
+
+```
+### B
+
+Fit a boosting model to the training set with Purchase as the response and the other variables as predictors. Use 1,000 trees, and a shrinkage value of 0.01. Which predictors appear to be the most important?
+
+```{r}
+library(caret)
+mod_11 <- gbm(Purchase~., data=cr_train, shrinkage=0.1, distribution = 'bernoulli', n.trees=1000, verbose=F)
+#best.iter = gbm.perf(mod_11, method="cv")
+summary(mod_11)
+
+```
+
+
+## <font color ="white">Punto 12</font>{.tabset}
+
+Apply boosting, bagging, and random forests to a data set of your choice. Be sure to fit the models on a training set and to evaluate their performance on a test set. How accurate are the results compared to simple methods like linear or logistic regression? Which of these approaches yields the best performance?
+
+```{r}
+# Base de mtcars
+# Predicción de millas por galon 
+#bagging
+mod_mpg <- randomForest(mpg ~., data=mtcars, mtry=13, importance =TRUE)
+mod_mpg
+
+# RandonForest
+mpg_rf <- randomForest(mpg ~., data=mtcars, mtry=13, ntree =100, importance =TRUE)
+mpg_rf
+
+#regresion
+mpg_bo <- lm(mpg ~., data=mtcars)
+summary(mpg_bo)
+```
+El compratmiento en los tres modelos es muy parecido en cuanto al RMSE, diferien muy poco peude que mejore en lo modelos de bagging y rendomForest dependiendo de la poda del arbol y el número de arboles construidos es decir buscar el optimo de los parámetros con una malla. 
+
+
+# <font color ="darkcyan">*Sesion 9.7.2*</font>{.tabset}
+
+## <font color ="white">*PUNTO 4*</font>{.tabset}
+
+Generate a simulated two-class data set with 100 observations and
+two features in which there is a visible but non-linear separation between
+the two classes. Show that in this setting, a support vector
+machine with a polynomial kernel (with degree greater than 1) or a
+radial kernel will outperform a support vector classifier on the training
+data. Which technique performs best on the test data? Make
+plots and report training and test error rates in order to back up
+your assertions.
+
+#### **Datos simulados**
+
+- Generacion de un conjunto de datos simulados de dos clases con 100 observaciones y dos características con separacion no lineal.
+
+```{r maquinas dat simulados}
+set.seed (131019)
+x <- matrix(rnorm (200*2) , ncol =2)
+x[1:100 ,] <- x[1:100 ,]+3
+x[101:150 ,] <- x[101:150 ,] -3
+y <- c(rep (1,150) ,rep (2,50))
+dat <- data.frame(x=x,y=as.factor(y))
+```
+
+- Representación gráfica de los datos exhibiendo cada categoria por color, note que la separacion no es lineal.
+
+```{r plot datos}
+plot(x, col=y, pch =16, las=1);grid()
+```
+
+### **Máquina de soporte vectorial con núcleo polinomico** {.tabset}
+
+
+#### **Modelo con Suport Vector Machine**
+
+```{r, echo=FALSE, warning=FALSE,message=FALSE,include=FALSE}
+library(e1071)
+```
+
+```{r modelo svm poly}
+train <- sample(200,100)
+svmfitPol <- svm(y∼., data=dat[train,], kernel ='polynomial', cost=1, degree=2)
+plot(svmfitPol , dat[train,])
+```
+
+- De este gráfico podemos observar que la maquina de soporte polinomial cuadratica separa con una banda bastante bien los datos.
+
+#### **Tasa de clasificacion buena y mala**
+
+```{r}
+test <- dat[-train,]
+predict_svm <- predict(svmfitPol, test)
+```
+
+```{r mconfus msv poly}
+mc_svm <- table(predict_svm, test$y)
+mc_svm %>% kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+```{r tasa de clasificacion buena y mala svm poly}
+cl_bsmv <- (mc_svm[1,1]+mc_svm[2,2])/length(test$y)
+cl_msvm <- (mc_svm[1,2]+mc_svm[2,1])/length(test$y)
+kable(cl_bsmv,col.names = "Buena Clasificacion")
+kable(cl_msvm,col.names = "Mala Clasificacion")
+```
+
+- Con la matrix de confusión anterior podemos observar que la tasa de buena clasificacion es de el 85% en la base de datos simulada.
+
+### **Máquina de soporte vectorial con núcleo radial** {.tabset}
+
+#### **Modelo con Suport Vector Machine**
+
+```{r, echo=FALSE, warning=FALSE,message=FALSE,include=FALSE}
+library(e1071)
+```
+
+```{r model svm poly}
+train <- sample(200,100)
+svmfitRad <- svm(y∼., data=dat[train,], kernel ='radial', cost=1)
+plot(svmfitRad , dat[train,])
+```
+
+- Del gráfico anterior se detecta un ajuste a los datos muy similar al caso anterior, con diferencia en la cola que se extiende para aglomerar mas datos de clase.
+
+#### **Tasa de clasificacion buena y mala**
+
+```{r}
+test <- dat[-train,]
+predict_svm2 <- predict(svmfitRad, test)
+```
+
+
+```{r mconfusion msv radial}
+mc_svm2 <- table(predict_svm2, test$y)
+mc_svm2 %>% kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+```{r tasa de clas buena y mala svm poly, echo = FALSE}
+clasificacion_bsmv2 <- (mc_svm2[1,1]+mc_svm2[2,2])/length(test$y)
+clasificacion_msvm2 <- (mc_svm2[1,2]+mc_svm2[2,1])/length(test$y)
+kable(clasificacion_bsmv2,col.names = "Buena Clasificación")
+kable(clasificacion_msvm2,col.names = "Mala Clasificación")
+```
+
+- La tasa de error al ajustar el modelo con un núcleo radial es mucho menor que con un núcleo polynomial, este clasifico mal apenas un 1% de los datos.
+
+## <font color ="white">*PUNTO 5*</font> {.tabset}
+
+We have seen that we can fit an SVM with a non-linear kernel in order
+to perform <br> classification using a non-linear decision boundary.We will
+now see that we can also obtain a non-linear decision boundary by
+performing logistic <br> regression using non-linear transformations of the
+features.
+
+<font color ="darkcyan">Literales:</font>
+
+### **A**
+
+Generate a data set with n = 500 and p = 2, such that the observations
+belong to two classes with a quadratic decision boundary
+between them. For instance, you can do this as follows:
+
+Creamos unos datos con n = 500 y p = 2, tal que manera que las observaciones pertenezcan a dos clases con una frontera de decisión cuadrática entre ellas.
+
+```{r}
+x1=runif (500) -0.5
+x2=runif (500) -0.5
+y=1*( x1^2-x2^2 > 0)
+```
+
+### **B**
+
+Plot the observations, colored according to their class labels.
+Your plot should display X1 on the x-axis, and X2 on the yaxis.
+
+```{r}
+plot(x1[y == 0], x2[y == 0], col = "red", xlab = "X1", ylab = "X2", las=1,pch = 16,las=1)
+points(x1[y == 1], x2[y == 1], col = "blue",pch=16)
+```
+
+### **C**
+
+Fit a logistic regression model to the data, using X1 and X2 as
+predictors
+
+Ajustamos un modelo de regresión logistica con covariables x1 y x2
+
+```{r}
+mod_log <- glm(y~x1+x2, family ="binomial")
+```
+
+### **D** {.tabset}
+
+Apply this model to the training data in order to obtain a predicted
+class label for each training observation. Plot the observations,
+colored according to the predicted class labels. The
+decision boundary should be linear.
+
+#### **Ajuste del Modelo**
+
+```{r}
+set.seed(131019)
+x1 <- runif(500) - 0.5
+x2 <- runif(500) - 0.5
+y <- as.integer(x1 ^ 2 - x2 ^ 2 > 0)
+datos <- data.frame(x1 = x1, x2 = x2, y = as.factor(y))
+lr.fit <- glm(y ~ ., data = datos, family = 'binomial')
+lr.prob <- predict(lr.fit, newdata = datos, type = 'response')
+lr.prob[lr.prob >.5]<-1
+lr.prob[lr.prob <.5]<-0
+data <- data.frame(datos,lr.prob)
+data$lr.prob <- as.factor(data$lr.prob)
+plot(data$x1,data$x2, col=data$lr.prob, xlab = "X1", ylab = "X2", las=1,pch=16)
+```
+
+#### **Confusion Matrix**
+
+```{r m confu msv glm}
+mc_glmsvm <- table(lr.prob, datos$y)
+mc_glmsvm %>% kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+#### **Tasa de buena y mala clasificacion**
+
+
+```{r tcbm buena y mala svm glm}
+clasificacion_glmsvm1 <- (mc_glmsvm[1,1]+mc_glmsvm[2,2])/(mc_glmsvm[1,1]+mc_glmsvm[1,2]+mc_glmsvm[2,1]+mc_glmsvm[2,2])
+clasificacion_glmsvm <- (mc_glmsvm[1,2]+mc_glmsvm[2,1])/(mc_glmsvm[1,1]+mc_glmsvm[1,2]+mc_glmsvm[2,1]+mc_glmsvm[2,2])
+kable(clasificacion_glmsvm1,col.names = "Buena Clasificación")
+kable(clasificacion_glmsvm,col.names = "Mala Clasificación")
+```
+
+
+- Podemos ver que para el modelo ajustado con glm se tiene una tasa de mala clasificación de alrededor 51% por lo que podríamos decir que el modelo no esta clasificando de manera correcta la clase a la que pertenecen las observaciones.
+
+
+### **E** 
+ <font color ="darkcyan">**Modelo Ajustado**</font> {.tabset}
+
+Now fit a logistic regression model to the data using non-linear
+functions of X1 and X2 as predictors (e.g. X2
+1 , X1×X2, log(X2),
+and so forth).
+
+Ahora se ajusta un modelo de regresión logística a los datos usando funciones no lineales de X1 y X2 como predictores. 
+
+```{r, warning=FALSE, message=FALSE}
+set.seed(1)
+x1 <- runif(500) - 0.5
+x2 <- runif(500) - 0.5
+y <- as.integer(x1 ^ 2 - x2 ^ 2 > 0)
+dat2 <- data.frame(x1 = x1 , x2 =x2, y = as.factor(y))
+lr.fit2 <- glm(y ~ poly(x1, 3) + poly(x2, 3), data = dat2, family = 'binomial')
+```
+
+### **F** {.tabset}
+
+Apply this model to the training data in order to obtain a predicted
+class label for each training observation. Plot the observations,
+colored according to the predicted class labels. The
+decision boundary should be obviously non-linear. If it is not,
+then repeat (a)-(e) until you come up with an example in which
+the predicted class labels are obviously non-linear.
+
+#### **Predicciones**
+
+```{r}
+lr.prob2 <- predict(lr.fit2, newdata = dat2, type = 'response')
+lr.prob2[lr.prob2 >.5]<-1
+lr.prob2[lr.prob2 <.5]<-0
+data2 <- data.frame(dat2,lr.prob2)
+data2$lr.prob2 <- as.factor(data2$lr.prob2)
+plot(data2$x1,data2$x2, col=data2$lr.prob2, xlab = "X1", ylab = "X2", las=1,pch=16)
+```
+
+#### **Tasa de buena y mala clasificacion**
+
+```{r mconfus msv glm22}
+mc_glmsvm2 <- table(lr.prob2, dat2$y)
+mc_glmsvm2 %>% kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+```{r tas clas buena y mala svm glm2}
+clasificacion_glmsvm23 <- (mc_glmsvm2[1,1]+mc_glmsvm2[2,2])/(mc_glmsvm2[1,1]+mc_glmsvm2[1,2]+mc_glmsvm2[2,1]+mc_glmsvm2[2,2])
+clasificacion_glmsvm2 <- (mc_glmsvm2[1,2]+mc_glmsvm2[2,1])/(mc_glmsvm2[1,1]+mc_glmsvm2[1,2]+mc_glmsvm2[2,1]+mc_glmsvm2[2,2])
+kable(clasificacion_glmsvm23,col.names = "Buena Clasificación")
+kable(clasificacion_glmsvm2,col.names = "Mala Clasificación")
+```
+
+- Del modelo anterior podemos ver que la clasificación fue muy buena, clasifico correctamente todas las observaciones en la clase correspondiente, pues la tasa de buena lasificacion es de el 100%. 
+
+### **G** {.tabset}
+
+Fit a support vector classifier to the data with X1 and X2 as
+predictors. Obtain a class prediction for each training observation.
+Plot the observations, colored according to the predicted
+class labels.
+
+#### **Modelo Ajustado**
+
+- Ajustaremos un modelo utilizando el método de máquinas de soporte vectorial
+
+```{r,message=FALSE,warning=FALSE,echo=FALSE,include=FALSE}
+library(e1071)
+```
+
+```{r, warning=FALSE,message=FALSE}
+set.seed(1)
+x1 <- runif(500) - 0.5
+x2 <- runif(500) - 0.5
+y <- as.integer(x1 ^ 2 - x2 ^ 2 > 0)
+data2 <- data.frame(x1 = x1, x2 = x2, y = as.factor(y))
+svm.fit <- svm(y ~ ., data = datos, kernel='linear')
+
+```
+
+#### **Predicciones y Grafica**
+
+```{r,warning=FALSE,message=FALSE}
+svm.prob <- predict(svm.fit, newdata = data2, type = 'response')
+svm.prob[svm.prob >.5]<-1
+svm.prob[svm.prob <.5]<-0
+datta <- data.frame(data2,svm.prob)
+datta$svm.prob <- as.factor(datta$svm.prob)
+plot(datta$x1,datta$x2, col=datta$svm.prob,xlab="X1",ylab="X2",las=1,pch =16)
+```
+
+### **H** {.tabset}
+
+Fit a SVM using a non-linear kernel to the data. Obtain a class
+prediction for each training observation. Plot the observations,
+colored according to the predicted class labels.
+
+#### **Modelo ajustado**
+
+- Ajustaremos un modelo utilizando el método de máquinas de soporte vectorial
+
+```{r,message=FALSE,warning=FALSE,echo=FALSE,include=FALSE}
+library(e1071)
+```
+
+```{r, warning=FALSE,message=FALSE}
+set.seed(1)
+x1 <- runif(500) - 0.5
+x2 <- runif(500) - 0.5
+y <- as.integer(x1 ^ 2 - x2 ^ 2 > 0)
+data_2 <- data.frame(x1 = x1, x2 = x2, y = as.factor(y))
+svm_fit <- svm(y ~ ., data = datos, kernel='radial')
+
+```
+#### **Predicciones y Grafica**
+
+```{r,warning=FALSE,message=FALSE}
+svm_prob <- predict(svm_fit, newdata = data_2, type = 'response')
+svm_prob[svm_prob >.5]<-1
+svm_prob[svm_prob <.5]<-0
+datta_2 <- data.frame(data_2,svm_prob)
+datta_2$svm_prob <- as.factor(datta_2$svm_prob)
+plot(datta_2$x1,datta_2$x2, col=datta_2$svm_prob, xlab="X1",ylab="X2",las=1,pch=16)
+```
+
+### **I** {.tabset}
+
+Comment on your results.
+
+#### **Matriz de confusión con núcleo lineal**
+
+```{r}
+mc_svml <- table(svm.prob, datos$y)
+mc_svml %>% kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+```{r}
+
+clasificacion_svm1 <- (mc_svml[1,1]+mc_svml[2,2])/length(datta$y)
+clasificacion_svm <- (mc_svml[1,2]+mc_svml[2,1])/length(datta$y)
+kable(clasificacion_svm1, col.names = "Clasificación buena")
+kable(clasificacion_svm, col.names = "clasificación mala")
+```
+
+
+- Notemos que para el modelo ajustado svm con nucleo lineal se tiene una tasa de mala clasificación del 48% por lo que podríamos decir que el modelo no esta discriminando de manera correcta la clase a la que pertenece cada observación.
+
+#### **Matriz de confusión con núcleo radial**
+
+```{r}
+
+mc_svmr <- table(svm_prob, datos$y)
+mc_svmr %>% kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+ 
+```{r}
+clasificacion_svmr1 <- (mc_svmr[1,1]+mc_svmr[2,2])/length(datta_2$y)
+clasificacion_svmr <- (mc_svmr[1,2]+mc_svmr[2,1])/length(datta_2$y)
+kable(clasificacion_svmr1, col.names = "Clasificación buena")
+kable(clasificacion_svmr, col.names = "clasificación mala")
+```
+
+- Notemos que el modelo con nucleo Radial es ligeramente mejor pues la tasa de buena clasificacion es de 50% aproximadamente, mientras que el modelo de nucleo lineal s de al rededor 46%, lo que es menor.
+
+## <font color ="white">*PUNTO 6*</font> {.tabset}
+
+At the end of Section 9.6.1, it is claimed that in the case of data that
+is just barely linearly separable, a support vector classifier with a
+small value of cost that misclassifies a couple of training observations
+may perform better on test data than one with a huge value of cost
+that does not misclassify any training observations. You will now
+investigate this claim.
+
+<font color ="darkcyan">Literales:</font>
+
+### **A**
+
+Generate two-class data with p = 2 in such a way that the classes
+are just barely linearly separable.
+
+Simulamos datos con dos clases, p = 2 de tal manera que las clases son apenas lineales separables.
+
+```{r}
+set.seed(1)
+obs <-  1000
+x1 <- runif(obs, min = -4, max = 4)
+x2 <- runif(obs, min = -1, max = 16)
+y <- ifelse(x2 > x1 ^ 2, 0, 1)
+daticos <- data.frame(x1 = x1, x2 = x2, y = as.factor(y))
+```
+
+
+### **B**
+
+Compute the cross-validation error rates for support vector
+classifiers with a range of cost values. How many training errors
+are misclassified for each value of cost considered, and how
+does this relate to the cross-validation errors obtained?
+
+Calcularemos las tasas de error de validación cruzada sobre los vectores de clasificacion de apoyo con un rango de costos.
+
+```{r}
+set.seed (1)
+tune.out <- tune(svm, y∼.,data=daticos ,kernel="linear",
+ranges = list(cost=c(0.001 , 0.01, 0.1, 1,5,10,100)))
+```
+
+Obtengamos un summary del modelo 
+
+```{r}
+summary(tune.out)
+```
+
+- Analizar los errores con los valores de costo vemos que el error más bajo es cuando se tiene un costo de 0.01 ahora, la función *tune()* almacena el mejor modelo obtenido, como sigue:
+
+```{r}
+bestmod <- tune.out$best.model
+summary (bestmod)
+```
+
+### **C**
+
+Generate an appropriate test data set, and compute the test
+errors corresponding to each of the values of cost considered.
+Which value of cost leads to the fewest test errors, and how
+does this compare to the values of cost that yield the fewest
+training errors and the fewest cross-validation errors?
+
+- Particionaremos la base de datos en datos de entrenamiento y datos de prueba
+
+```{r}
+n1 <- 1000
+n <- sample(1:nrow(daticos), n1*0.7)
+da.train <- daticos[n,]
+da.test <- daticos[-n,]
+```
+
+- Para obtener los errores con los diferentes costos para los datos de prueba
+
+```{r, warning=FALSE, message=FALSE,echo=FALSE}
+cost.grid=c(0.001 , 0.01, 0.1, 1,5,10,100)
+err.rate.test <- rep(NA, length(cost.grid))
+for (cost in cost.grid) {
+  svm.fit <- svm(y ~ ., data = da.train, kernel = 'linear', cost = cost)
+  res <- table(prediction = predict(svm.fit, newdata = da.test), truth = da.test$y)
+  err.rate.test[match(cost, cost.grid)] <- (res[2,1] + res[1,2]) / sum(res)
+}
+err.rate.test
+```
+
+```{r}
+kable(paste('El cost', cost.grid[which.min(err.rate.test)], 'tiene el minimo error de prueba de:', min(err.rate.test)), col.names = "Resultado")
+```
+
+
+### **D**
+
+Discuss your results.
+
+- Luego de realizar un análisis para encontrar un costo tal que minimice el error en la clasificación se ve que es más adecuado el de costo = 0.01.
+
+```{r, echo=FALSE}
+barplot(c(0.3533333,0.2200000,0.2333333,0.2333333,
+          0.2333333,0.2333333,0.2333333),col='red',
+        names.arg = c('0.001' , '0.01', '0.1', '1','5','10','100'))
+```
+
+
+## <font color ="white">*PUNTO 7*</font> {.tabset}
+
+In this problem, you will use support vector approaches in order to
+predict whether a given car gets high or low gas mileage based on the
+Auto data set.
+
+<font color ="darkcyan">Literales:</font>
+
+### **A**
+
+Create a binary variable that takes on a 1 for cars with gas
+mileage above the median, and a 0 for cars with gas mileage
+below the median.
+
+En este problema, se utilizarán enfoques de vectores de soporte para predecir si un coche determinado tiene un alto o bajo kilometraje basado la base de datos Auto
+
+Descripción de los datos:
+
+Un marco de datos con 392 observaciones sobre las siguientes 9 variables.
+
+- **mpg**:millas por galón.
+- **Cilindros**: numero de cilindros entre 4 y 8.
+- **Desplazamiento**: desplazamiento del motor.
+- **caballos de fuerza**: caballos de fuerza del motor
+- **Peso**: Peso del vehículo
+- **aceleración**:Tiempo para acelerar de 0 a 60 mph
+- **año**:Año del modelo
+- **origen**:Origen del coche (1. americano, 2. europeo, 3. japones)
+- **nombre**:nombre del vehiculo
+
+Los datos tienen 408 observaciones y se eliminaron 16 observaciones con NA's.
+
+```{r,message=FALSE,warning=FALSE,include=FALSE,echo=FALSE}
+library(ISLR)
+library(e1071)
+```
+
+Crearemos una variable binaria que tome el valor de uno si el valor de mpg es mayor a su mediana y cero si es menor.
+
+```{r}
+mediana <- median(Auto$mpg)
+kable(mediana, col.names="Mediana")
+```
+
+```{r}
+median_mpg <- y <- ifelse(Auto$mpg > mediana, 1, 0)
+bd_auto <- data.frame(Auto,median_mpg)
+bd_auto <- bd_auto[,-1]
+```
+
+### **B**
+
+Fit a support vector classifier to the data with various values
+of cost, in order to predict whether a car gets high or low gas
+mileage. Report the cross-validation errors associated with different
+values of this parameter. Comment on your results.
+
+Calculemos las tasas de error de validación cruzada de los clasificadores de vectores de soporte con el rango de valores para costo.
+
+```{r}
+tune.auto <- tune(svm, median_mpg ~ ., data = bd_auto, kernel = 'linear', ranges = list(cost=c(0.001 , 0.01, 0.1, 1,5,10,100)))
+```
+
+Ahora veamos el resumen del modelo
+
+```{r}
+summary(tune.auto)
+```
+
+- Del summary del modelo podemos ver que el error más pequeño es cuando el cost es igual a 1.
+
+
+### **C**
+
+Now repeat (b), this time using SVMs with radial and polynomial
+basis kernels, with different values of gamma and degree and
+cost. Comment on your results.
+
+Se repetira el literal b, esta vez usando SVM con núcleos de base radial y polinómica, con diferentes valores de gamma y grado y costo.
+
+<font color ="darkcyan">**Modelo con kernel radial**</font>
+
+```{r}
+tune.auto2 <- tune(svm, median_mpg ~ ., data = bd_auto, kernel = "radial", ranges = list(cost=c(0.001 , 0.01, 0.1, 1,5,10,100),gamma=c(0.5,1,2,3,4)))
+```
+
+```{r}
+summary(tune.auto2)
+```
+
+```{r}
+bestmod <- tune.auto2$best.model
+bestmod
+```
+
+- Del resumen podemos ver que el mejor modelo tiene un gamma de 0.5 y un cost igual a 1 para un kernel radial. 
+
+<font color ="darkcyan">**Modelo con kernel polynomial**</font>
+
+```{r}
+tune.auto3 <- tune(svm, median_mpg ~ ., data = bd_auto, kernel = "polynomial", ranges = list(cost=c(0.001 , 0.01, 0.1, 1,5,10,100),gamma=c(0.5,1,2,3,4), degree=c(2,3,4)))
+```
+
+```{r}
+summary(tune.auto3)
+```
+
+```{r}
+bestmod <- tune.auto3$best.model
+bestmod
+```
+
+- Del resumen obtenido para el modelo ajustado con un kernel polynomial se observa que el mejor ajusta es el que tiene un cost=0.001, degree=3 y gamma=2
+
+### **D**
+
+Make some plots to back up your assertions in (b) and (c).
+Hint: In the lab, we used the plot() function for svm objects
+only in cases with p = 2. When p > 2, you can use the plot()
+function to create plots displaying pairs of variables at a time.
+Essentially, instead of typing
+
+Con el fin de justificar los resultados obtenidos en los literales anteriores, se procedió a realizar los gráficos correspondientes a los modelos ajustados sobre diferentes núcleos y parámetros óptimos, en dichos gráficos el eje Y corresponde a la variable mpg y en el eje x cada una de las covariables, para así observar la relación entre cada covariable y la variable respuesta
+
+```{r}
+bd_auto <- data.frame(Auto,median_mpg)
+bd_auto$median_mpg <- as.factor(bd_auto$median_mpg)
+
+svm.linear <- svm(median_mpg ~ ., data = bd_auto, kernel = "linear", cost = 0.1)
+svm.poly <- svm(median_mpg ~ ., data = bd_auto, kernel = "polynomial", cost = 0.001, degree = 3, gamma=2)
+svm.radial <- svm(median_mpg ~ ., data = bd_auto, kernel = "radial", cost = 1, gamma = 0.5)
+plotpairs = function(fit) {
+  for (name in names(bd_auto)[!(names(bd_auto) %in% c("mpg", "median_mpg", "name"))]) {
+    plot(svm.linear, bd_auto, as.formula(paste("mpg~", name, sep = "")))
+  }
+}
+plotpairs(svm.linear)
+plotpairs(svm.poly)
+plotpairs(svm.radial)
+
+```
+
+## <font color ="white">*PUNTO 8*</font> {.tabset}
+
+This problem involves the OJ data set which is part of the ISLR
+package.
+
+<font color ="darkcyan">Literales:</font>
+
+### **A**
+
+Create a training set containing a random sample of 800
+observations, and a test set containing the remaining
+observations.
+
+Creamos un conjunto de entrenamiento que contiene una muestra aleatoria de 800 observaciones y un conjunto de prueba que contiene las observaciones restantes.
+
+```{r}
+set.seed(1)
+train <- sample(nrow(OJ), 800)
+OJ.train <- OJ[train, ]
+OJ.test <- OJ[-train, ]
+```
+
+### **B**
+
+Fit a support vector classifier to the training data using
+cost=0.01, with Purchase as the response and the other variables
+as predictors. Use the summary() function to produce summary
+statistics, and describe the results obtained.
+
+Modelo ajustado de SVM a los datos de entrenamiento usando "costo"=0.01
+
+```{r}
+svm.oj <- svm(Purchase ~ ., data = OJ.train, kernel = "linear", cost = 0.01)
+summary(svm.oj)
+```
+
+### **C** {.tabset}
+
+What are the training and test error rates?
+
+Uzaremos las matrices de confuacion para responder esta pregunta, como sigue:
+
+#### **Matriz de confusión para Train**
+
+```{r}
+train.pred <- predict(svm.oj, OJ.train)
+svm_oj <- table(OJ.train$Purchase, train.pred)
+svm_oj %>% kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+#### **Tasas de clasificación**
+
+```{r}
+clasificacion_svmbuena <- (svm_oj[1,1]+svm_oj[2,2])/length(OJ.train$Purchase)
+clasificacion_svmala <- (svm_oj[1,2]+svm_oj[2,1])/length(OJ.train$Purchase)
+kable(clasificacion_svmbuena, col.names="Clasificacion buena")
+kable(clasificacion_svmala, col.names="Clasificación mala")
+
+```
+
+#### **Matriz de confusión para Test**
+
+```{r}
+test.pred <- predict(svm.oj, OJ.test)
+svm_ojt <- table(OJ.test$Purchase, test.pred)
+svm_oj %>% kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+#### **Tasas de clasificación**
+
+```{r}
+clasificacion_svmbuena <- (svm_ojt[1,1]+svm_ojt[2,2])/length(OJ.test$Purchase)
+clasificacion_svmala <- (svm_oj[1,2]+svm_ojt[2,1])/length(OJ.test$Purchase)
+kable(clasificacion_svmbuena, col.names="Clasificacion buena")
+kable(clasificacion_svmala, col.names="Clasificación mala")
+```
+
+- La tasa de error para el modelo ajustado con los  datos de entrenamiento es de 17% y la tasa de error para los datos de prueba es de 36%.
+
+
+### **D**
+
+Use the tune() function to select an optimal cost. Consider values
+in the range 0.01 to 10.
+
+Selección de un "costo" óptimo con tune.
+
+```{r}
+set.seed(2)
+tune.out <- tune(svm, Purchase ~ ., data = OJ.train, kernel = "linear", ranges = list(cost = seq(0.01, 10, by = 0.25)))
+summary(tune.out)
+```
+
+Se puede observar que el error es menor cuando se utiliza un cost igual a 4.01, teniendo conocimiento de esto, obtengamos el mejor modelo 
+
+```{r}
+bestmod <- tune.out$best.model
+bestmod
+```
+
+### **E** {.tabset}
+
+Compute the training and test error rates using this new value
+for cost.
+
+#### **Modelo Ajustado**
+
+Ajuste modelo svm con el costo optimo 
+
+```{r}
+svm.li <- svm(Purchase ~ ., kernel = "linear", data = OJ.train, cost = tune.out$best.parameter$cost)
+```
+
+#### **Matriz de confusión en Train** 
+
+```{r}
+train.pred <- predict(svm.li, OJ.train)
+svm1 <- table(OJ.train$Purchase, train.pred)
+svm1 %>% kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+#### **Tasas de clasificación**
+
+```{r}
+clasificacion_svmbue <- (svm1[1,1]+svm1[2,2])/length(OJ.train$Purchase)
+clasificacion_svmal <- (svm1[1,2]+svm1[2,1])/length(OJ.train$Purchase)
+kable(clasificacion_svmbue, col.names="Clasificacion buena")
+kable(clasificacion_svmal, col.names="Clasificación mala")
+```
+
+#### **Matriz de confusión en Test** 
+
+```{r}
+test.pred <- predict(svm.li, OJ.test)
+svm_test <-table(OJ.test$Purchase, test.pred)
+svm_test %>% kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+#### **Tasas de clasificación**
+
+```{r}
+clasificacion_svmbu <- (svm_test[1,1]+svm_test[2,2])/length(OJ.test$Purchase)
+clasificacion_svma <- (svm_test[1,2]+svm_test[2,1])/length(OJ.test$Purchase)
+kable(clasificacion_svmbu, col.names="Clasificacion buena")
+kable(clasificacion_svma, col.names="Clasificación mala")
+```
+
+- De acuerdo con las matrices de confusión obtenidas anteriormente, la tasa de error para el modelo ajustado para entrenamiento es de alrededor de 16% mientras que la tasa de error para prueba es de 15%.
+
+### **F** {.tabset}
+
+Repeat parts (b) through (e) using a support vector machine
+with a radial kernel. Use the default value for gamma.
+
+#### **Modelo Ajustado**
+
+Ajuste modelo svm con nucleo radial y parámetro gamma predeterminado.
+
+```{r}
+svm.radial <- svm(Purchase ~ ., kernel = "radial", data = OJ.train)
+summary(svm.radial)
+```
+
+#### **Matriz de confusión datos train y test** 
+
+```{r}
+train.predr <- predict(svm.radial, OJ.train)
+svm_rad <- table(OJ.train$Purchase, train.predr)
+svm_rad %>% kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+
+<font color ="darkcyan"> **Tasas de clasificación**</font> 
+
+```{r}
+clasificacion_svmbue <- (svm_rad[1,1]+svm_rad[2,2])/length(OJ.train$Purchase)
+clasificacion_svmal <- (svm_rad[1,2]+svm_rad[2,1])/length(OJ.train$Purchase)
+kable(clasificacion_svmbue, col.names="Clasificacion buena")
+kable(clasificacion_svmal, col.names="Clasificación mala")
+```
+
+<font color ="darkcyan"> **Matriz de confusión en Train** </font>
+
+```{r}
+test.predr <- predict(svm.radial, OJ.test)
+svm_radt <-table(OJ.test$Purchase, test.predr)
+svm_rad %>% kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+<font color ="darkcyan"> **Tasas de clasificación** </font>
+
+```{r}
+clasificacion_svmbue <- (svm_radt[1,1]+svm_radt[2,2])/length(OJ.test$Purchase)
+clasificacion_svmal <- (svm_radt[1,2]+svm_radt[2,1])/length(OJ.test$Purchase)
+kable(clasificacion_svmbue, col.names="Clasificacion buena")
+kable(clasificacion_svmal, col.names="Clasificación mala")
+
+```
+
+
+- El núcleo radial con gamma predeterminado crea 373 vectores de soporte, de los que 188 pertenecen al nivel CH y los demas restantes pertenecen al nivel MM. Tiene un error de entrenamiento del 15% y un error de prueba del 18.5%, son tasas muy similares con respecto al núcleo lineal. Ahora usamos validación cruzada para encontrar el costo óptimo.
+
+#### **Ajuste modelo con costo óptimo**
+
+```{r}
+set.seed(2)
+tune.outra <- tune(svm, Purchase ~ ., data = OJ.train, kernel = "radial", ranges = list(cost = seq(0.01, 10, by = 0.25)))
+summary(tune.outra)
+```
+
+<font color ="darkcyan"> **Ajuste modelo svm con costo óptimo** </font>
+
+```{r}
+svm.radialc <- svm(Purchase ~ ., kernel = "radial", data = OJ.train, cost = tune.outra$best.parameter$cost)
+summary(svm.radialc)
+```
+
+#### **Matriz de confusión modelo radial train y test** 
+
+```{r}
+train.pred <- predict(svm.radialc, OJ.train)
+mta<- table(OJ.train$Purchase, train.pred)
+mta %>% kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+<font color ="darkcyan"> **Tasas de clasificación** </font>
+
+```{r}
+clasificacion_svmbuenc <- (mta[1,1]+mta[2,2])/length(OJ.train$Purchase)
+clasificacion_svmalac <- (mta[1,2]+mta[2,1])/length(OJ.train$Purchase)
+kable(clasificacion_svmbuenc, col.names="Clasificacion buena")
+kable(clasificacion_svmalac, col.names="Clasificación mala")
+
+```
+
+<font color ="darkcyan"> **Matriz de confusión datos de prueba modelo radial** </font>
+
+```{r}
+test.pred <- predict(svm.radialc, OJ.test)
+mop <- table(OJ.test$Purchase, test.pred)
+mop %>% kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+
+```
+
+<font color ="darkcyan"> **Tasa de clasificación** </font>
+
+```{r}
+clasificacion_svmbueop <- (mop[1,1]+mop[2,2])/length(OJ.test$Purchase)
+clasificacion_svmalop <- (mop[1,2]+mop[2,1])/length(OJ.test$Purchase)
+kable(clasificacion_svmbueop, col.names="Clasificacion buena")
+kable(clasificacion_svmalop, col.names="Clasificación mala")
+
+```
+
+- El clasificador tiene un error de entrenamiento del 14% y un error de prueba del 17%, es una mejora respecto al modelo ajustado con un costo predeterminado, por lo tanto el costo óptimo calculado anteriormente logra minimizar el error tanto train como en test.
+
+### **G** {.tabset}
+
+Repeat parts (b) through (e) using a support vector machine
+with a polynomial kernel. Set degree=2.
+
+#### **Modelo Ajustado**
+
+Modelo ajustado svm con nucleo polinomial grado=2.
+
+```{r}
+svm.poly <- svm(Purchase ~ ., kernel = "polynomial", data = OJ.train, degree=2)
+summary(svm.poly)
+```
+
+#### **Matriz de confusión datos train y test** 
+
+```{r}
+train.predrpo <- predict(svm.poly, OJ.train)
+svm_poly <- table(OJ.train$Purchase, train.predrpo)
+svm_poly %>% kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+<font color ="darkcyan"> **Tasas de clasificación** </font>
+
+```{r}
+clasificacion_svmbuepo <- (svm_poly[1,1]+svm_poly[2,2])/length(OJ.train$Purchase)
+clasificacion_svmalpo <- (svm_poly[1,2]+svm_poly[2,1])/length(OJ.train$Purchase)
+kable(clasificacion_svmbuepo, col.names="Clasificacion buena")
+kable(clasificacion_svmalpo, col.names="Clasificación mala")
+
+```
+
+<font color ="darkcyan"> **Matriz de confusión datos de prueba** </font>
+
+```{r}
+test.predpol <- predict(svm.poly, OJ.test)
+svm_pol <-table(OJ.test$Purchase, test.predpol)
+svm_pol %>% kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+<font color ="darkcyan"> **Tasas de clasificación** </font>
+
+```{r}
+clasificacion_svmbuep <- (svm_pol[1,1]+svm_pol[2,2])/length(OJ.test$Purchase)
+clasificacion_svmalp <- (svm_pol[1,2]+svm_pol[2,1])/length(OJ.test$Purchase)
+kable(clasificacion_svmbuep, col.names="Clasificacion buena")
+kable(clasificacion_svmalp, col.names="Clasificación mala")
+
+```
+
+- El núcleo polinómico con degree=2 crea 447 vectores de soporte, de los cuales, 225 pertenecen al nivel CH y los 222 restantes pertenecen al nivel MM. El clasificador tiene un error de entrenamiento del 18% y un error de prueba del 22%, lo que es una ligera mejora con repecto a el núcleo lineal. Ahora usamos validación cruzada para encontrar el costo óptimo.
+
+#### **Ajuste modelo svm con costo óptimo**
+
+```{r}
+set.seed(2)
+tune.outrapo <- tune(svm, Purchase ~ ., data = OJ.train, kernel = "polynomial",degree=2, ranges = list(cost = seq(0.01, 10, by = 0.25)))
+summary(tune.outrapo)
+```
+
+<font color ="darkcyan"> **Ajuste modelo svm con costo óptimo** </font>
+
+```{r}
+svm.polyc <- svm(Purchase ~ ., kernel = "polynomial",degree=2, data = OJ.train, cost = tune.outrapo$best.parameter$cost)
+summary(svm.polyc)
+```
+
+#### **Matriz de confusión modelo polinomial train y test** 
+
+```{r}
+train.predpo <- predict(svm.polyc, OJ.train)
+poli<- table(OJ.train$Purchase, train.predpo)
+poli %>% kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+<font color ="darkcyan"> **Tasa de clasificación buena y mala** </font>
+
+```{r}
+clasificacion_svmbuenp <- (poli[1,1]+poli[2,2])/length(OJ.train$Purchase)
+clasificacion_svmalap <- (poli[1,2]+poli[2,1])/length(OJ.train$Purchase)
+kable(clasificacion_svmbuenp, col.names="Clasificacion buena")
+kable(clasificacion_svmalap, col.names="Clasificación mala")
+
+```
+
+<font color ="darkcyan"> **Matriz de confusión para datos de entrenamiento modelo polinomial** </font>
+
+```{r}
+test.predpo <- predict(svm.polyc, OJ.test)
+polyc <- table(OJ.test$Purchase, test.predpo)
+polyc %>% kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+<font color ="darkcyan"> **Tasa de clasificación buena y mala** </font>
+
+```{r}
+clasificacion_svmbueopt <- (polyc[1,1]+polyc[2,2])/length(OJ.test$Purchase)
+clasificacion_svmalopt <- (polyc[1,2]+polyc[2,1])/length(OJ.test$Purchase)
+kable(clasificacion_svmbueopt, col.names="Clasificacion buena")
+kable(clasificacion_svmalopt, col.names="Clasificación mala")
+
+```
+
+- El clasificador tiene un error de entrenamiento del 15% y un error de prueba del 20%,lo que es una  mejora con respecto al modelo ajustado con un costo predeterminado, por lo tanto el costo óptimo calculado anteriormente logra minimizar el error tanto de entrenamiento como de prueba.
+
+### **H** {.tabset}
+
+Overall, which approach seems to give the best results on this
+data?
+
+- El modelo ajustado con núcleo radial parece estar produciendo un error mínimo de clasificación errónea en los datos de entrenamiento y de prueba, tanto para el ajuste con un costo predeterminado o el costo óptimo. Lo que  nos permite concluir que de los modelos analizados anteriormente el mejor es el modelo con núcleo radial, costo=1.26 y gamma predeterminada.
+
+
+# <font color ="darkcyan">*Ensayo*</font>{.tabset}
+
+<center> <h1> ES EL APRENDIZAJE ESTADÍSTICO PIEZA FUNDAMENTAL EN EL ENTENDIMIENTO DE LA CALIDAD DEL AIRE EN MEDELLÍN </h1> </center>
+
+
+<p align = "justify">La salud cardiovascular y respiratoria de la población, tanto a largo como a corto plazo depende en gran parte de la calidad del aire. Cada día la contaminación del aire en el mundo va en aumento, es tan así que actualmente es uno de los problemas ambientales más severos a nivel mundial, ya que está presente en todas las sociedades, independientemente del nivel de desarrollo socioeconómico, y constituye un fenómeno que tiene fuerte incidencia sobre la salud de los humanos. El crecimiento económico y la urbanización, asociados al desarrollo de diversas actividades como la industria petrolera, los servicios, la agroindustria y el incremento de las unidades automotoras, traen como resultado elevados volúmenes de contaminantes. </p>
+
+<p align = "justify"> El área metropolitana del Valle de Aburrá, en particular la ciudad de Medellín no se queda atrás con esta problemática. Desde ya varios años vienen implementando estrategias para reducir el problema centrado principalmente en la cantidad de automóviles en la ciudad, para esto han articulado la Estrategia Nacional de Calidad del aire que prioriza acciones enfocadas en la reducción de emisiones contaminantes generadas por los vehículos automotores y las actividades productivas de servicio haciéndolo parte de uno de los objetivos del desarrollo sostenible (ODS) dado que es un problema ambiental que aqueja a la población para al menos los próximos 15 años. </p>
+
+<p align = "justify"> La Alcaldía de Medellín en el portal de datos abiertos cuenta con información de contaminantes obtenida por la red de monitoreo de calidad del aire, discriminada por cada contaminante, además con un conjunto de datos llamado Encuesta de Calidad de Vida – Medellín Como Vamos, la cual consta de 342 preguntas cubriendo 15 dimensiones sociales en la que se encuentra la calidad del medio ambiente y su percepción según los habitantes de cada barrio de la ciudad. Con estos datos y el uso aprendizaje estadístico se puede entender mejor algunos fenómenos de la calidad del aire dentro de la ciudad, por ejemplo con Análisis de Componentes Principales se puede crear un indicador intraurbano que cuantifique la gravedad del aire según la percepción de los ciudadanos conjugada con la información del monitoreo, también estimar acertadamente el número de vehículos por familia en cada barrio y así plantear otros tipos de estrategias a parte del pico y placa ambiental que ayuden con la reducción de movilidad particular. </p>
+
+<p align = "justify">Sin embargo, el horizonte es poco alentador en unos años sobre la calidad del aire dado el aumento del parque automotor y crecimiento comercial, por eso es importante también diseñar otros tipos de encuesta y recolección de datos con el fin de llegar a factores de riesgo más certeros con los cuales se pueda atacar el problema de raíz y dar una solución más grande y duradera a este problema de Salud Pública, además de crear otras encuestas de percepción sobre el uso del transporte público y la bicicleta para implementar estrategias que consoliden estos medios de transporte por encima del particular.</p>
+
+<p align = "justify"> En conclusión ,la principal consecuencia de la calidad del aire es la afectación a la salud, una de las principales causas es la cantidad de vehiculos con su constante crecimiento y una solución efectiva es la identificación de relaciones causantes de la mala calidad del aire a partir de información recolectada día a día</p>
+
+
+<h2>Referencias </h2>
++ OMS (2005). *Guías para la Calidad del Aire - Resumen de Evaluación de los Riesgos.*
++ Clean Air Institute (2016) *Plan integral de gestión de la calidad del aire para el área metropolitana del Valle de Aburá*. Obtenido de: https://www.metropol.gov.co/ambiental/calidad-del-aire/Documents/PIGECA/PIGECA-Aprobado-Dic-2017.pdf
++ Romero M; Olite D; Alvarez Mireza (2006). *La contaminación del aire: su repercusión como problema de salud*. Revista Cubana de Higiene y Epidemiología.
+
++ OMS 2018. *Calidad del aire y salud - Datos y cifras*. Obtenido de: https://www.who.int/es/news-room/fact-sheets/detail/ambient-(outdoor)-air-quality-and-health
+
++ Medellín Como Vamos. (2019). *Indice de Progreso Social Comunas y Corregimientos de Medellin 2013 - 2017 - Reporte Metodologico*
+
